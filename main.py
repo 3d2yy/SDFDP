@@ -41,26 +41,26 @@ def generate_synthetic_signal(state='verde', duration=1000, fs=10000, noise_leve
     # Parámetros según el estado
     if state == 'verde':
         # Estado normal: pocas descargas de baja amplitud
-        n_discharges = 5
-        amplitude = 1.0
+        n_discharges = 3
+        amplitude = 0.8
         frequency = 1000  # Hz
         
     elif state == 'amarillo':
         # Estado precaución: más descargas, amplitud moderada
-        n_discharges = 15
-        amplitude = 2.5
+        n_discharges = 10
+        amplitude = 2.0
         frequency = 1500
         
     elif state == 'naranja':
         # Estado alerta: muchas descargas, amplitud alta
-        n_discharges = 30
-        amplitude = 4.5
+        n_discharges = 25
+        amplitude = 4.0
         frequency = 2000
         
     else:  # rojo
         # Estado crítico: descargas frecuentes, amplitud muy alta
-        n_discharges = 50
-        amplitude = 7.0
+        n_discharges = 45
+        amplitude = 6.5
         frequency = 2500
     
     # Añadir pulsos de descarga parcial
@@ -127,11 +127,25 @@ def process_and_analyze_signal(signal_data, fs, baseline_profile=None):
     baseline_stats = baseline_profile.get('stats') if baseline_profile else None
     baseline_severities = baseline_profile.get('severities') if baseline_profile else None
     
+    # Pesos para los descriptores más importantes en detección de DP
+    custom_weights = {
+        'energy_total': 2.0,        # Muy importante
+        'rms': 2.0,                 # Muy importante
+        'peak_count': 2.5,          # Crítico para DP
+        'crest_factor': 1.5,        # Importante
+        'spectral_entropy': 1.5,    # Importante
+        'kurtosis': 1.2,            # Moderado
+        'skewness': 1.0,            # Moderado
+        'spectral_stability': 0.8,  # Menor peso
+        'zero_crossing_rate': 0.5   # Menor peso
+    }
+    
     severity_results = assess_severity(
         descriptors,
         baseline_stats=baseline_stats,
         baseline_severities=baseline_severities,
-        threshold_method='statistical'
+        threshold_method='statistical',
+        custom_weights=custom_weights
     )
     
     results['severity_index'] = severity_results['severity_index']

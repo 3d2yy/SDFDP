@@ -319,8 +319,12 @@ class AdaptiveLMS:
         # Calcular error
         error = desired - output
         
-        # Actualizar pesos
+        # Actualizar pesos con límite para evitar divergencia
         self.weights = self.weights + 2 * self.mu * error * self.buffer
+        
+        # Limitar magnitud de los pesos para evitar divergencia
+        max_weight = 10.0
+        self.weights = np.clip(self.weights, -max_weight, max_weight)
         
         return output, error
     

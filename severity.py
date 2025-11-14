@@ -56,12 +56,15 @@ def calculate_descriptor_scores(descriptors, baseline_stats=None):
     
     # Descriptores que aumentan con problemas (más es peor)
     increasing_descriptors = [
-        'energy_total', 'rms', 'kurtosis', 'crest_factor',
+        'energy_total', 'rms', 'crest_factor',
         'spectral_entropy', 'peak_count', 'residual_energy'
     ]
     
     # Descriptores que disminuyen con problemas (menos es peor)
     decreasing_descriptors = ['spectral_stability']
+    
+    # Descriptores donde la desviación absoluta importa
+    absolute_deviation_descriptors = ['kurtosis', 'skewness']
     
     for key, value in descriptors.items():
         # Saltar descriptores de banda si no están en las listas
@@ -92,6 +95,18 @@ def calculate_descriptor_scores(descriptors, baseline_stats=None):
             
             # Mayor desviación negativa = mayor problema
             scores[key] = max(0, -score)
+            
+        elif key in absolute_deviation_descriptors:
+            # Para estos descriptores, cualquier desviación es un problema
+            if baseline_stats and key in baseline_stats:
+                base_mean = baseline_stats[key]['mean']
+                base_std = baseline_stats[key]['std']
+                score = normalize_descriptor(value, base_mean, base_std)
+            else:
+                score = value
+            
+            # Usar valor absoluto de la desviación
+            scores[key] = abs(score)
     
     return scores
 
@@ -163,7 +178,7 @@ def determine_thresholds_percentile(baseline_values, percentiles=[50, 75, 90]):
     return thresholds
 
 
-def determine_thresholds_statistical(baseline_values, sigma_multipliers=[1, 2, 3]):
+def determine_thresholds_statistical(baseline_values, sigma_multipliers=[1.5, 4.0, 8.0]):
     """
     Determina umbrales usando reglas estadísticas (múltiplos de sigma).
     
@@ -211,9 +226,9 @@ def classify_traffic_light(severity_index, thresholds=None):
     # Umbrales predeterminados si no se proporcionan
     if thresholds is None:
         thresholds = {
-            'green_yellow': 1.0,
-            'yellow_orange': 2.0,
-            'orange_red': 3.0
+            'green_yellow': 2.0,
+            'yellow_orange': 6.0,
+            'orange_red': 15.0
         }
     
     if severity_index < thresholds['green_yellow']:
