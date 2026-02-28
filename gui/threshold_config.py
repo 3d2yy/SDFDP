@@ -6,7 +6,7 @@ Permite configurar y visualizar umbrales de clasificación para el sistema de de
 """
 
 import numpy as np
-from dash import dcc, html, Input, Output, State, callback
+from dash import dcc, html, Input, Output, State, callback, callback_context
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 

@@ -241,7 +241,7 @@ def create_layout():
                             html.Li("Haga clic en 'Generar Señal'."),
                             html.Li("Revise la señal, espectro, histograma y estadísticas."),
                             html.Li("Para exportar: seleccione formato (CSV, H5, MAT), nombre y metadatos."),
-                            html.Li("Haga clic en 'Exportar'. El archivo se guardará en /tmp/")
+                            html.Li("Haga clic en 'Exportar'. El archivo se guardará en la carpeta 'exports' del proyecto.")
                         ])
                     ])
                 ], className="mb-4")

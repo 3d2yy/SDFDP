@@ -193,7 +193,10 @@ def parse_csv_file(contents, filename, data_column, time_column=None):
     decoded = base64.b64decode(content_string)
     
     try:
-        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+        try:
+            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), comment='#')
+        except UnicodeDecodeError:
+            df = pd.read_csv(io.StringIO(decoded.decode('iso-8859-1')), comment='#')
         
         if data_column not in df.columns:
             # Intentar con la primera columna numérica
@@ -222,9 +225,11 @@ def parse_h5_file(contents, filename, data_column):
     
     try:
         import h5py
+        import tempfile
+        import os
         
         # Guardar temporalmente
-        temp_file = f"/tmp/{filename}"
+        temp_file = os.path.join(tempfile.gettempdir(), filename)
         with open(temp_file, 'wb') as f:
             f.write(decoded)
         
@@ -255,9 +260,11 @@ def parse_mat_file(contents, filename, data_column):
     
     try:
         from scipy.io import loadmat
+        import tempfile
+        import os
         
         # Guardar temporalmente
-        temp_file = f"/tmp/{filename}"
+        temp_file = os.path.join(tempfile.gettempdir(), filename)
         with open(temp_file, 'wb') as f:
             f.write(decoded)
         

@@ -12,6 +12,7 @@ from dash import dcc, html, Input, Output, State, callback
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from datetime import datetime
+import os
 
 # Importar funciones del sistema
 import sys
@@ -357,9 +358,13 @@ def export_signal(signal, metadata, filename, format_type, include_metadata):
         fs = metadata['sample_rate']
         data['time'] = np.arange(len(signal)) / fs
     
+    # Directorio de exportación
+    export_dir = os.path.join(os.getcwd(), "exports")
+    os.makedirs(export_dir, exist_ok=True)
+    
     # Exportar según formato
     if format_type == 'csv':
-        filepath = f"/tmp/{filename}.csv"
+        filepath = os.path.join(export_dir, f"{filename}.csv")
         df = pd.DataFrame(data)
         
         # Agregar metadatos como comentarios
@@ -383,7 +388,7 @@ def export_signal(signal, metadata, filename, format_type, include_metadata):
     
     elif format_type == 'h5':
         import h5py
-        filepath = f"/tmp/{filename}.h5"
+        filepath = os.path.join(export_dir, f"{filename}.h5")
         
         with h5py.File(filepath, 'w') as f:
             # Guardar señal
@@ -410,7 +415,7 @@ def export_signal(signal, metadata, filename, format_type, include_metadata):
     
     else:  # mat
         from scipy.io import savemat
-        filepath = f"/tmp/{filename}.mat"
+        filepath = os.path.join(export_dir, f"{filename}.mat")
         
         mat_data = {'signal': signal}
         

@@ -1,4 +1,4 @@
-# 🔌 Sistema de Detección de Descargas Parciales UHF - Interfaz Gráfica
+# 🔌 UHF Partial Discharge Detection System - Graphical Interface
 
 <div align="center">
 
@@ -6,62 +6,62 @@
 ![Dash](https://img.shields.io/badge/Dash-2.14+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-**Sistema profesional de monitoreo en tiempo real y análisis offline de descargas parciales**
+**Professional platform for real-time monitoring and offline analysis of partial discharge signals**
 
 </div>
 
 ---
 
-## 🚀 Características Principales
+## 🚀 Main Features
 
-### 📡 **Captura en Vivo**
-- **Hardware Real**: Compatible con NI PXIe-5185 (12.5 GS/s, 3 GHz BW, 8-bit)
-- **Modo Simulación**: Generación sintética para pruebas sin hardware
-- **Monitoreo en Tiempo Real**: Visualización continua de señales y descriptores
-- **Clasificación Automática**: Sistema tipo semáforo (Verde/Amarillo/Naranja/Rojo)
+### 📡 **Live Capture**
+- **Real Hardware**: Compatible with NI PXIe-5185 (12.5 GS/s, 3 GHz BW, 8-bit)
+- **Simulation Mode**: Synthetic generation for no-hardware testing
+- **Real-Time Monitoring**: Continuous plotting of signals and descriptors
+- **Automatic Classification**: Traffic-light severity states (Green/Yellow/Orange/Red)
 
-### 📂 **Análisis de Archivos**
-- **Formatos Múltiples**: CSV, HDF5 (.h5), MATLAB (.mat)
-- **Visualizaciones Completas**: Señal, espectro, descriptores, radar chart
-- **Procesamiento Avanzado**: Filtrado, normalización, extracción de envolvente
-- **Evaluación de Severidad**: Clasificación automática con detalles
+### 📂 **File Analysis**
+- **Multiple Formats**: CSV, HDF5 (.h5), MATLAB (.mat)
+- **Full Visualizations**: Signal, spectrum, descriptors, radar chart
+- **Advanced Processing**: Filtering, normalization, envelope extraction
+- **Severity Evaluation**: Automatic classification with detailed outputs
 
-### ⚙️ **Generador de Señales**
-- **Parámetros Personalizables**: Estado, amplitud, frecuencia, ruido
-- **Tipos de Ruido**: Gaussiano, Rosa, Marrón, Uniforme
-- **Exportación Múltiple**: CSV, HDF5, MAT con metadatos
-- **Análisis Inmediato**: Estadísticas, espectro, histogramas
+### ⚙️ **Signal Generator**
+- **Custom Parameters**: State, amplitude, frequency, noise
+- **Noise Types**: Gaussian, Pink, Brown, Uniform
+- **Multi-Format Export**: CSV, HDF5, MAT with metadata
+- **Immediate Analysis**: Statistics, spectrum, histograms
 
-### 🎯 **Configuración de Umbrales**
-- **Umbrales Personalizables**: Ajuste de límites de clasificación
-- **Pesos de Descriptores**: Control sobre importancia relativa
-- **Pruebas Interactivas**: Generación y clasificación en vivo
-- **Validación Completa**: Matriz de confusión y métricas de precisión
+### 🎯 **Threshold Configuration**
+- **Custom Thresholds**: Adjust classification boundaries
+- **Descriptor Weights**: Control relative importance
+- **Interactive Tests**: Generate and classify in real time
+- **Full Validation**: Confusion matrix and accuracy metrics
 
-### 📚 **Documentación Integrada**
-- Guía de uso paso a paso
-- Especificaciones técnicas
-- Mejores prácticas
+### 📚 **Integrated Documentation**
+- Step-by-step user guidance
+- Technical specifications
+- Best practices
 
 ---
 
-## 📦 Instalación
+## 📦 Installation
 
-### 1. Clonar o descargar el repositorio
+### 1. Clone or download the repository
 
 ```bash
 cd /workspaces/V2DP
 ```
 
-### 2. Instalar dependencias
+### 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. (Opcional) Instalar soporte para hardware NI
+### 3. (Optional) Install NI hardware support
 
-Si va a usar hardware National Instruments:
+If you plan to use National Instruments hardware:
 
 ```bash
 pip install nidaqmx
@@ -69,211 +69,211 @@ pip install nidaqmx
 
 ---
 
-## 🎯 Uso Rápido
+## 🎯 Quick Use
 
-### Iniciar la aplicación:
+### Start the application
 
 ```bash
 python app.py
 ```
 
-La interfaz estará disponible en: **http://localhost:8050**
+The interface is available at: **http://localhost:8050**
 
-### Flujo de trabajo recomendado:
+### Recommended workflow
 
-1. **📚 Documentación**: Familiarícese con el sistema
-2. **🎯 Configuración de Umbrales**: Ajuste parámetros si es necesario
-3. **⚙️ Generador**: Cree señales de prueba
-4. **📂 Análisis de Archivos**: Analice datos existentes
-5. **📡 Captura en Vivo**: Monitoreo en tiempo real
+1. **📚 Documentation**: Understand system behavior
+2. **🎯 Threshold Configuration**: Adjust parameters as needed
+3. **⚙️ Generator**: Create synthetic test signals
+4. **📂 File Analysis**: Analyze existing recordings
+5. **📡 Live Capture**: Move to real-time monitoring
 
 ---
 
-## 🔧 Configuración
+## 🔧 Configuration
 
-### Hardware NI PXIe-5185
+### NI PXIe-5185 Hardware
 
-Para usar con hardware real, en la pestaña **Captura en Vivo**:
+To use real hardware, in **Live Capture**:
 
-1. Seleccione "Hardware NI PXIe-5185"
+1. Select "NI PXIe-5185 Hardware"
 2. Configure:
-   - **Device**: Nombre del dispositivo (ej: `PXI1Slot2`)
-   - **Canal**: Número de canal analógico (ej: `0`)
-   - **Frecuencia de Muestreo**: En GS/s (ej: `12.5`)
-3. Inicie la captura
+   - **Device**: Device name (for example `PXI1Slot2`)
+   - **Channel**: Analog channel number (for example `0`)
+   - **Sampling Rate**: In GS/s (for example `12.5`)
+3. Start capture
 
-### Modo Simulación
+### Simulation Mode
 
-Para pruebas sin hardware:
+For no-hardware testing:
 
-1. Seleccione "Modo Simulación"
-2. Elija el estado a simular:
-   - 🟢 Verde (Normal)
-   - 🟡 Amarillo (Precaución)
-   - 🟠 Naranja (Alerta)
-   - 🔴 Rojo (Crítico)
-3. Ajuste el nivel de ruido
-4. Inicie la captura
+1. Select "Simulation Mode"
+2. Choose state:
+   - 🟢 Green (Normal)
+   - 🟡 Yellow (Caution)
+   - 🟠 Orange (Alert)
+   - 🔴 Red (Critical)
+3. Tune noise level
+4. Start capture
 
 ---
 
-## 📊 Descriptores Calculados
+## 📊 Computed Descriptors
 
-El sistema calcula 9 descriptores para caracterizar las señales:
+The operational path computes nine descriptors:
 
-| # | Descriptor | Descripción |
+| # | Descriptor | Description |
 |---|------------|-------------|
-| 1 | **Energía Total** | Suma de cuadrados de la señal |
-| 2 | **RMS** | Valor cuadrático medio |
-| 3 | **Curtosis** | Medida de "picos" en distribución |
-| 4 | **Asimetría** | Sesgo de la distribución |
-| 5 | **Factor de Cresta** | Relación pico/RMS |
-| 6 | **Conteo de Picos** | Número de picos significativos |
-| 7 | **Entropía Espectral** | Desorden en el espectro |
-| 8 | **Estabilidad Espectral** | Consistencia del espectro |
-| 9 | **Tasa de Cruces por Cero** | Frecuencia de cambios de signo |
+| 1 | **Total Energy** | Sum of squared signal amplitudes |
+| 2 | **RMS** | Root mean square value |
+| 3 | **Kurtosis** | Tail/peakedness indicator |
+| 4 | **Skewness** | Distribution asymmetry |
+| 5 | **Crest Factor** | Peak-to-RMS ratio |
+| 6 | **Peak Count** | Number of significant peaks |
+| 7 | **Spectral Entropy** | Spectral disorder |
+| 8 | **Spectral Stability** | Inter-window spectral consistency |
+| 9 | **Zero-Crossing Rate** | Sign-change frequency |
 
 ---
 
-## 🎨 Estructura del Proyecto
+## 🎨 Project Structure
 
 ```
 V2DP/
-├── app.py                      # Aplicación principal Dash
+├── app.py                      # Main Dash application
 ├── gui/
 │   ├── __init__.py
-│   ├── live_capture.py         # Captura en tiempo real
-│   ├── file_analysis.py        # Análisis de archivos
-│   ├── signal_generator.py     # Generador de señales
-│   ├── threshold_config.py     # Configuración de umbrales
-│   └── documentation.py        # Documentación
-├── main.py                     # Sistema de backend
-├── preprocessing.py            # Preprocesamiento de señales
-├── descriptors.py              # Cálculo de descriptores
-├── severity.py                 # Evaluación de severidad
-├── blind_algorithms.py         # Algoritmos ciegos
-├── validation.py               # Validación del sistema
-└── requirements.txt            # Dependencias
+│   ├── live_capture.py         # Real-time capture tab
+│   ├── file_analysis.py        # File analysis tab
+│   ├── signal_generator.py     # Signal generator tab
+│   ├── threshold_config.py     # Threshold configuration tab
+│   └── documentation.py        # In-app docs tab
+├── main.py                     # Backend processing layer
+├── preprocessing.py            # Signal preprocessing + MC optimization
+├── descriptors.py              # Δt extraction + legacy descriptors
+├── severity.py                 # Severity scoring and traffic-light mapping
+├── blind_algorithms.py         # Δt tracking algorithms
+├── validation.py               # Complexity and validation metrics
+└── requirements.txt            # Dependencies
 ```
 
 ---
 
-## 🔬 Especificaciones Técnicas
+## 🔬 Technical Specifications
 
-### Sistema de Adquisición
+### Acquisition System
 
-| Componente | Especificación |
+| Component | Specification |
 |------------|----------------|
-| **Sistema** | NI PXIe-1071 |
-| **Controlador** | NI PXIe-8135 (Embebido) |
-| **Tarjeta** | NI PXIe-5185 |
-| **Ancho de Banda** | 3 GHz |
-| **Frecuencia de Muestreo** | 12.5 GS/s |
-| **Resolución** | 8 bits |
+| **System** | NI PXIe-1071 |
+| **Controller** | NI PXIe-8135 (Embedded) |
+| **Digitizer** | NI PXIe-5185 |
+| **Bandwidth** | 3 GHz |
+| **Sampling Rate** | 12.5 GS/s |
+| **Resolution** | 8 bits |
 
-### Procesamiento de Señal
+### Signal Processing
 
-- **Filtrado**: Pasa-banda (1% - 40% de fs)
-- **Normalización**: Adaptativa
-- **Envolvente**: Transformada de Hilbert
-- **Reducción de Ruido**: Wavelets
-
----
-
-## 📖 Ejemplos de Uso
-
-### Ejemplo 1: Análisis de archivo CSV
-
-```python
-# En la pestaña "Análisis de Archivos":
-# 1. Cargar archivo CSV con señal
-# 2. Configurar fs = 10000 Hz
-# 3. Columna de datos = "signal"
-# 4. Clic en "Analizar Señal"
-# 5. Ver clasificación y descriptores
-```
-
-### Ejemplo 2: Generar dataset sintético
-
-```python
-# En la pestaña "Generador de Señales":
-# 1. Estado = "Naranja"
-# 2. Duración = 5000 muestras
-# 3. Descargas = 30
-# 4. Amplitud = 4.0
-# 5. Clic en "Generar Señal"
-# 6. Exportar como HDF5 con metadatos
-```
-
-### Ejemplo 3: Calibrar umbrales
-
-```python
-# En la pestaña "Configuración de Umbrales":
-# 1. Ajustar Verde→Amarillo = 0.3
-# 2. Ajustar Amarillo→Naranja = 0.6
-# 3. Ajustar Naranja→Rojo = 0.8
-# 4. Clic en "Ejecutar Prueba Completa"
-# 5. Ver matriz de confusión y precisión
-```
+- **Filtering**: Band-pass (1% - 40% of fs)
+- **Normalization**: Adaptive
+- **Envelope**: Hilbert transform
+- **Denoising**: Wavelets
 
 ---
 
-## 🐛 Solución de Problemas
+## 📖 Usage Examples
 
-### Error: "nidaqmx no está instalado"
+### Example 1: Analyze a CSV file
+
+```python
+# In the "File Analysis" tab:
+# 1. Upload a CSV signal file
+# 2. Set fs = 10000 Hz
+# 3. Set data column = "signal"
+# 4. Click "Analyze Signal"
+# 5. Review classification and descriptors
+```
+
+### Example 2: Generate a synthetic dataset
+
+```python
+# In the "Signal Generator" tab:
+# 1. State = "Orange"
+# 2. Duration = 5000 samples
+# 3. Discharges = 30
+# 4. Amplitude = 4.0
+# 5. Click "Generate Signal"
+# 6. Export as HDF5 with metadata
+```
+
+### Example 3: Calibrate thresholds
+
+```python
+# In the "Threshold Configuration" tab:
+# 1. Set Green→Yellow = 0.3
+# 2. Set Yellow→Orange = 0.6
+# 3. Set Orange→Red = 0.8
+# 4. Click "Run Full Test"
+# 5. Review confusion matrix and accuracy
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Error: "nidaqmx is not installed"
 
 ```bash
 pip install nidaqmx
 ```
 
-### Error: "h5py no encontrado"
+### Error: "h5py not found"
 
 ```bash
 pip install h5py
 ```
 
-### La aplicación no inicia
+### Application does not start
 
-Verifique que todas las dependencias estén instaladas:
+Make sure all dependencies are installed:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### No se detecta el hardware NI
+### NI hardware is not detected
 
-1. Verifique que el controlador NI-DAQmx esté instalado
-2. Confirme el nombre del dispositivo en NI MAX
-3. Use el nombre correcto en la configuración
-
----
-
-## 🤝 Contribuciones
-
-Este es un sistema profesional de detección de descargas parciales. Para mejoras o reportar problemas, consulte la documentación del proyecto.
+1. Verify NI-DAQmx driver installation
+2. Confirm the device name in NI MAX
+3. Use the exact device name in settings
 
 ---
 
-## 📄 Licencia
+## 🤝 Contributing
 
-Ver archivo LICENSE en el repositorio.
+Contributions are welcome. Please open an issue before large structural changes.
 
 ---
 
-## 🙏 Agradecimientos
+## 📄 License
 
-Sistema desarrollado utilizando:
-- **Dash & Plotly**: Visualizaciones interactivas
-- **NumPy & SciPy**: Procesamiento científico
-- **NI-DAQmx**: Integración con hardware profesional
-- **Bootstrap**: Diseño responsivo
+See LICENSE / license.md.
+
+---
+
+## 🙏 Acknowledgements
+
+Built with:
+- **Dash & Plotly** for interactive visualization
+- **NumPy & SciPy** for scientific processing
+- **NI-DAQmx** for instrumentation integration
+- **Bootstrap** for responsive UI design
 
 ---
 
 <div align="center">
 
-**🔌 Sistema de Detección de Descargas Parciales UHF**
+**🔌 UHF Partial Discharge Detection System**
 
-*Monitoreo profesional en tiempo real para equipos de alta tensión*
+*Professional real-time monitoring for high-voltage assets*
 
 </div>

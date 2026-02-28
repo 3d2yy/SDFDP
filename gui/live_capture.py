@@ -9,7 +9,7 @@ Soporta:
 """
 
 import numpy as np
-from dash import dcc, html, Input, Output, State, callback
+from dash import dcc, html, Input, Output, State, callback, callback_context
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from collections import deque
