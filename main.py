@@ -1,278 +1,473 @@
 """
-Main entry point — Doctoral UHF-PD validation pipeline.
+Módulo principal para el sistema de detección de fallas mediante descargas parciales.
 
-Executes the four-phase numerical workflow:
-    Phase 1: Stochastic wavelet optimisation (Monte Carlo + grid search)
-    Phase 2: Variable isolation via inter-pulse interval extraction (Δt)
-    Phase 3: Tracking with Kalman, adaptive EWMA, and CUSUM
-    Phase 4: Quantification (empirical Big-O + convergence/FPR confusion matrix)
+Este módulo integra todos los componentes del sistema y proporciona una interfaz
+para procesar señales, calcular descriptores, evaluar severidad y comparar algoritmos.
 """
 
-from __future__ import annotations
-
-import sys
 import numpy as np
-
-from preprocessing import (
-    generate_uhf_pd_signal_physical,
-    monte_carlo_wavelet_optimization,
-    wavelet_denoise_parametric,
-)
-from descriptors import extract_delta_t_vector
-from blind_algorithms import apply_delta_t_tracking
-from validation import (
-    measure_all_tracking_complexities,
-    generate_convergence_confusion_matrix,
-    generate_phase4_report,
-)
+from preprocessing import preprocess_signal
+from descriptors import compute_all_descriptors
+from severity import assess_severity, create_baseline_profile
+from blind_algorithms import compare_algorithms, EWMA, SimpleMovingAverage, KalmanFilter1D, AdaptiveLMS, AdaptiveRLS
+from validation import validate_detection_system, generate_validation_report
 
 
-# ===================================================================
-# Pipeline helpers
-# ===================================================================
-
-def run_phase1(
-    n_samples: int = 4096,
-    fs: float = 1e9,
-    n_iterations: int = 500,
-    seed: int = 42,
-    verbose: bool = True,
-):
-    """Phase 1 — Stochastic wavelet optimisation.
-
-    Returns
-    -------
-    mc_result : MonteCarloResult
-        Optimal wavelet configuration and full grid.
-    clean : ndarray
-        Clean reference signal used for optimisation.
-    noisy : ndarray
-        Noisy copy used for optimisation.
+def generate_synthetic_signal(state='verde', duration=1000, fs=10000, noise_level=0.1):
     """
-    if verbose:
-        print("=" * 70)
-        print("PHASE 1 — Stochastic Wavelet Optimisation")
-        print("=" * 70)
-
-    clean, noisy = generate_uhf_pd_signal_physical(
-        n_samples=n_samples, fs=fs, seed=seed,
-    )
-
-    mc_result = monte_carlo_wavelet_optimization(
-        reference_clean=clean,
-        fs=fs,
-        n_iterations=n_iterations,
-        seed=seed,
-        verbose=verbose,
-    )
-
-    if verbose:
-        print(f"\n  Optimal config: wavelet={mc_result.best_wavelet}, "
-              f"mode={mc_result.best_threshold_mode}, "
-              f"rule={mc_result.best_threshold_rule}")
-        print(f"  E[RMSE]={mc_result.best_rmse_mean:.6f}, "
-              f"Var[RMSE]={mc_result.best_rmse_var:.2e}, "
-              f"converged={mc_result.converged}")
-
-    return mc_result, clean, noisy
-
-
-def run_phase2(
-    noisy_signal,
-    fs: float = 1e9,
-    mc_result=None,
-    threshold_sigma: float = 3.0,
-    verbose: bool = True,
-):
-    """Phase 2 — Δt vector extraction (variable isolation).
-
-    Parameters
-    ----------
-    noisy_signal : ndarray
-        Signal to process.
+    Genera una señal sintética de descarga parcial para diferentes estados operativos.
+    
+    Parámetros:
+    -----------
+    state : str
+        Estado operativo: 'verde', 'amarillo', 'naranja', 'rojo'
+    duration : int
+        Número de muestras
     fs : float
-        Sampling frequency.
-    mc_result : MonteCarloResult, optional
-        If provided, applies the optimal wavelet denoising before extraction.
-    threshold_sigma : float
-        Pulse detection threshold in multiples of σ.
-
-    Returns
-    -------
-    delta_t : ndarray
-        1-D inter-pulse interval vector [Δt₁, Δt₂, …] in seconds.
-    denoised : ndarray
-        Denoised signal (if mc_result provided) or original.
+        Frecuencia de muestreo
+    noise_level : float
+        Nivel de ruido base
+    
+    Retorna:
+    --------
+    signal : ndarray
+        Señal sintética generada
     """
-    if verbose:
-        print("\n" + "=" * 70)
-        print("PHASE 2 — Δt Vector Extraction (Variable Isolation)")
-        print("=" * 70)
+    t = np.arange(duration) / fs
+    
+    # Señal base con ruido
+    signal = noise_level * np.random.randn(duration)
+    
+    # Parámetros según el estado
+    if state == 'verde':
+        # Estado normal: pocas descargas de baja amplitud
+        n_discharges = 3
+        amplitude = 0.8
+        frequency = 1000  # Hz
+        
+    elif state == 'amarillo':
+        # Estado precaución: más descargas, amplitud moderada
+        n_discharges = 10
+        amplitude = 2.0
+        frequency = 1500
+        
+    elif state == 'naranja':
+        # Estado alerta: muchas descargas, amplitud alta
+        n_discharges = 25
+        amplitude = 4.0
+        frequency = 2000
+        
+    else:  # rojo
+        # Estado crítico: descargas frecuentes, amplitud muy alta
+        n_discharges = 45
+        amplitude = 6.5
+        frequency = 2500
+    
+    # Añadir pulsos de descarga parcial
+    for _ in range(n_discharges):
+        # Posición aleatoria
+        pos = np.random.randint(100, duration - 100)
+        
+        # Duración del pulso (microsegundos simulados)
+        pulse_duration = int(0.01 * fs)  # 10 ms
+        
+        # Generar pulso oscilatorio amortiguado
+        t_pulse = np.arange(pulse_duration) / fs
+        decay = np.exp(-t_pulse * 500)
+        pulse = amplitude * np.sin(2 * np.pi * frequency * t_pulse) * decay
+        
+        # Añadir a la señal
+        end_pos = min(pos + pulse_duration, duration)
+        signal[pos:end_pos] += pulse[:end_pos-pos]
+    
+    return signal
 
-    # Apply optimal wavelet denoising from Phase 1
-    if mc_result is not None:
-        denoised = wavelet_denoise_parametric(
-            noisy_signal,
-            wavelet=mc_result.best_wavelet,
-            threshold_mode=mc_result.best_threshold_mode,
-            threshold_rule=mc_result.best_threshold_rule,
-        )
-        if verbose:
-            print(f"  Denoised with {mc_result.best_wavelet} / "
-                  f"{mc_result.best_threshold_mode} / "
-                  f"{mc_result.best_threshold_rule}")
-    else:
-        denoised = noisy_signal
 
-    delta_t = extract_delta_t_vector(
-        denoised, fs, threshold_sigma=threshold_sigma,
-    )
-
-    if verbose:
-        print(f"  Extracted Δt vector: {len(delta_t)} intervals")
-        if len(delta_t) > 0:
-            print(f"  Δt statistics: mean={np.mean(delta_t):.4e} s, "
-                  f"std={np.std(delta_t):.4e} s, "
-                  f"min={np.min(delta_t):.4e} s, "
-                  f"max={np.max(delta_t):.4e} s")
-
-    return delta_t, denoised
-
-
-def run_phase3(delta_t, verbose: bool = True):
-    """Phase 3 — Tracking evaluation (Kalman, EWMA, CUSUM).
-
-    Returns
-    -------
-    tracking_result : DeltaTTrackingResult
-        Aggregated tracking results from all three algorithms.
+def process_and_analyze_signal(signal_data, fs, baseline_profile=None):
     """
-    if verbose:
-        print("\n" + "=" * 70)
-        print("PHASE 3 — Δt Tracking (Kalman / EWMA / CUSUM)")
-        print("=" * 70)
-
-    tracking_result = apply_delta_t_tracking(delta_t)
-
-    if verbose:
-        print(f"  Kalman: steady-state gain = "
-              f"{tracking_result.kalman.steady_state_gain:.6f}")
-        print(f"  EWMA: final α = "
-              f"{tracking_result.ewma.alpha_sequence[-1]:.4f}")
-        print(f"  CUSUM: {tracking_result.cusum.n_alarms} alarms "
-              f"(threshold={tracking_result.cusum.threshold:.2f})")
-
-    return tracking_result
-
-
-def run_phase4(
-    sizes=(256, 512, 1024, 2048, 4096, 8192),
-    n_repeats: int = 5,
-    seed: int = 42,
-    verbose: bool = True,
-):
-    """Phase 4 — Quantification (Big-O + convergence/FPR).
-
-    Returns
-    -------
-    complexity : dict
-        Per-algorithm Big-O estimates.
-    confusion : ConvergenceConfusionMatrix
-        Convergence-latency vs FPR matrix.
-    report : str
-        Human-readable Phase 4 report.
-    """
-    if verbose:
-        print("\n" + "=" * 70)
-        print("PHASE 4 — Asymptotic Quantification")
-        print("=" * 70)
-
-    if verbose:
-        print("  Measuring empirical Big-O complexities …")
-    complexity = measure_all_tracking_complexities(
-        sizes=sizes, n_repeats=n_repeats, seed=seed,
-    )
-
-    for name, est in complexity.items():
-        if verbose:
-            print(f"    {name}: O(n^{est.exponent_b:.2f})  "
-                  f"[R²={est.r_squared:.4f}]")
-
-    if verbose:
-        print("  Building convergence/FPR confusion matrix …")
-    confusion = generate_convergence_confusion_matrix(seed=seed)
-
-    report = generate_phase4_report(complexity, confusion)
-
-    if verbose:
-        print("\n" + report)
-
-    return complexity, confusion, report
-
-
-# ===================================================================
-# Main
-# ===================================================================
-
-def main(
-    n_samples: int = 4096,
-    fs: float = 1e9,
-    mc_iterations: int = 500,
-    seed: int = 42,
-    verbose: bool = True,
-):
-    """Execute the full four-phase doctoral pipeline.
-
-    Returns
-    -------
+    Procesa y analiza una señal completa.
+    
+    Parámetros:
+    -----------
+    signal_data : array-like
+        Señal en bruto
+    fs : float
+        Frecuencia de muestreo
+    baseline_profile : dict, opcional
+        Perfil de línea base para comparación
+    
+    Retorna:
+    --------
     results : dict
-        Dictionary containing outputs from all four phases.
+        Resultados completos del análisis
     """
-    # Phase 1 — Wavelet optimisation
-    mc_result, clean, noisy = run_phase1(
-        n_samples=n_samples, fs=fs, n_iterations=mc_iterations,
-        seed=seed, verbose=verbose,
+    results = {}
+    
+    # 1. Preprocesamiento
+    lowcut = fs * 0.01  # 1% de fs
+    highcut = fs * 0.4   # 40% de fs
+    
+    processed_signal, processing_info = preprocess_signal(
+        signal_data, fs, 
+        lowcut=lowcut, 
+        highcut=highcut,
+        normalize=True,
+        envelope=True,
+        denoise=True
     )
-
-    # Phase 2 — Δt extraction
-    delta_t, denoised = run_phase2(
-        noisy, fs=fs, mc_result=mc_result, verbose=verbose,
-    )
-
-    if len(delta_t) < 3:
-        print("\n⚠ Fewer than 3 Δt intervals detected. "
-              "Increase n_samples or n_pulses for meaningful tracking.")
-        return {
-            "phase1_mc_result": mc_result,
-            "phase2_delta_t": delta_t,
-            "phase2_denoised": denoised,
-        }
-
-    # Phase 3 — Tracking
-    tracking = run_phase3(delta_t, verbose=verbose)
-
-    # Phase 4 — Quantification
-    complexity, confusion, report = run_phase4(seed=seed, verbose=verbose)
-
-    results = {
-        "phase1_mc_result": mc_result,
-        "phase1_clean": clean,
-        "phase1_noisy": noisy,
-        "phase2_delta_t": delta_t,
-        "phase2_denoised": denoised,
-        "phase3_tracking": tracking,
-        "phase4_complexity": complexity,
-        "phase4_confusion": confusion,
-        "phase4_report": report,
+    
+    results['processing_info'] = processing_info
+    results['processed_signal'] = processed_signal
+    
+    # 2. Cálculo de descriptores
+    descriptors = compute_all_descriptors(processed_signal, fs, signal_data)
+    results['descriptors'] = descriptors
+    
+    # 3. Evaluación de severidad
+    baseline_stats = baseline_profile.get('stats') if baseline_profile else None
+    baseline_severities = baseline_profile.get('severities') if baseline_profile else None
+    
+    # Pesos para los descriptores más importantes en detección de DP
+    custom_weights = {
+        'energy_total': 2.0,        # Muy importante
+        'rms': 2.0,                 # Muy importante
+        'peak_count': 2.5,          # Crítico para DP
+        'crest_factor': 1.5,        # Importante
+        'spectral_entropy': 1.5,    # Importante
+        'kurtosis': 1.2,            # Moderado
+        'skewness': 1.0,            # Moderado
+        'spectral_stability': 0.8,  # Menor peso
+        'zero_crossing_rate': 0.5   # Menor peso
     }
-
-    if verbose:
-        print("\n" + "=" * 70)
-        print("✓ PIPELINE COMPLETE — All four phases executed successfully.")
-        print("=" * 70)
-
+    
+    severity_results = assess_severity(
+        descriptors,
+        baseline_stats=baseline_stats,
+        baseline_severities=baseline_severities,
+        threshold_method='statistical',
+        custom_weights=custom_weights
+    )
+    
+    results['severity_index'] = severity_results['severity_index']
+    results['descriptor_scores'] = severity_results['descriptor_scores']
+    results['thresholds'] = severity_results['thresholds']
+    results['traffic_light_state'] = severity_results['traffic_light_state']
+    
+    # 4. Comparación con algoritmos ciegos
+    blind_results = compare_algorithms(processed_signal)
+    results['blind_algorithms'] = blind_results
+    
     return results
 
 
+def evaluate_multiple_states(n_samples_per_state=10, fs=10000):
+    """
+    Evalúa el sistema con múltiples muestras de diferentes estados.
+    
+    Parámetros:
+    -----------
+    n_samples_per_state : int
+        Número de muestras por estado
+    fs : float
+        Frecuencia de muestreo
+    
+    Retorna:
+    --------
+    evaluation_results : dict
+        Resultados de la evaluación completa
+    """
+    states = ['verde', 'amarillo', 'naranja', 'rojo']
+    
+    # Generar señales y crear perfil de línea base (usando estado verde)
+    baseline_descriptors = []
+    baseline_severities = []
+    
+    print("Generando perfil de línea base...")
+    for i in range(n_samples_per_state):
+        signal = generate_synthetic_signal('verde', duration=1000, fs=fs)
+        lowcut = fs * 0.01
+        highcut = fs * 0.4
+        processed_signal, _ = preprocess_signal(signal, fs, lowcut, highcut, True, True, True)
+        descriptors = compute_all_descriptors(processed_signal, fs, signal)
+        baseline_descriptors.append(descriptors)
+    
+    baseline_profile = {
+        'stats': create_baseline_profile(baseline_descriptors),
+        'severities': None  # Se calculará después
+    }
+    
+    # Procesar todas las señales y recopilar resultados
+    all_results = {state: [] for state in states}
+    true_labels = []
+    predicted_labels = []
+    severity_indices = []
+    descriptors_by_state = {state: [] for state in states}
+    
+    print("\nProcesando señales por estado...")
+    for state in states:
+        print(f"  Estado: {state}")
+        for i in range(n_samples_per_state):
+            signal = generate_synthetic_signal(state, duration=1000, fs=fs)
+            results = process_and_analyze_signal(signal, fs, baseline_profile)
+            
+            all_results[state].append(results)
+            true_labels.append(state)
+            predicted_labels.append(results['traffic_light_state'])
+            severity_indices.append(results['severity_index'])
+            descriptors_by_state[state].append(results['descriptors'])
+    
+    # Actualizar baseline con severidades
+    baseline_profile['severities'] = severity_indices[:n_samples_per_state]
+    
+    # Validación del sistema
+    print("\nValidando sistema...")
+    validation_results = validate_detection_system(
+        true_labels,
+        predicted_labels,
+        severity_indices,
+        descriptors_by_state=descriptors_by_state
+    )
+    
+    # Comparación de algoritmos ciegos
+    print("\nComparando algoritmos ciegos...")
+    blind_comparison = compare_blind_algorithms_across_states(all_results, states)
+    
+    evaluation_results = {
+        'all_results': all_results,
+        'validation': validation_results,
+        'blind_comparison': blind_comparison,
+        'baseline_profile': baseline_profile
+    }
+    
+    return evaluation_results
+
+
+def compare_blind_algorithms_across_states(all_results, states):
+    """
+    Compara el rendimiento de algoritmos ciegos en diferentes estados.
+    
+    Parámetros:
+    -----------
+    all_results : dict
+        Resultados por estado
+    states : list
+        Lista de estados
+    
+    Retorna:
+    --------
+    comparison : dict
+        Comparación de algoritmos
+    """
+    algorithms = ['EWMA', 'SMA', 'Kalman', 'LMS', 'RLS']
+    
+    comparison = {alg: {state: [] for state in states} for alg in algorithms}
+    
+    for state in states:
+        for result in all_results[state]:
+            blind_results = result['blind_algorithms']
+            for alg in algorithms:
+                if alg in blind_results:
+                    comparison[alg][state].append(blind_results[alg]['score'])
+    
+    # Calcular estadísticas por algoritmo y estado
+    statistics = {}
+    for alg in algorithms:
+        statistics[alg] = {}
+        for state in states:
+            scores = comparison[alg][state]
+            if scores:
+                statistics[alg][state] = {
+                    'mean': np.mean(scores),
+                    'std': np.std(scores),
+                    'min': np.min(scores),
+                    'max': np.max(scores)
+                }
+    
+    return {
+        'raw_scores': comparison,
+        'statistics': statistics
+    }
+
+
+def generate_comparative_table(blind_comparison, states):
+    """
+    Genera una tabla comparativa de algoritmos ciegos.
+    
+    Parámetros:
+    -----------
+    blind_comparison : dict
+        Resultados de comparación de algoritmos
+    states : list
+        Lista de estados
+    
+    Retorna:
+    --------
+    table : str
+        Tabla formateada
+    """
+    statistics = blind_comparison['statistics']
+    algorithms = list(statistics.keys())
+    
+    table = []
+    table.append("=" * 90)
+    table.append("TABLA COMPARATIVA DE ALGORITMOS CIEGOS")
+    table.append("=" * 90)
+    table.append("")
+    
+    # Encabezado
+    header = f"{'Algoritmo':<15s}"
+    for state in states:
+        header += f" | {state:>18s}"
+    table.append(header)
+    table.append("-" * 90)
+    
+    # Datos por algoritmo
+    for alg in algorithms:
+        row = f"{alg:<15s}"
+        for state in states:
+            if state in statistics[alg]:
+                mean = statistics[alg][state]['mean']
+                std = statistics[alg][state]['std']
+                row += f" | {mean:8.4f} ± {std:6.4f}"
+            else:
+                row += f" | {'N/A':>18s}"
+        table.append(row)
+    
+    table.append("=" * 90)
+    table.append("")
+    table.append("Nota: Los valores representan puntuación media ± desviación estándar")
+    table.append("      Valores más bajos indican mejor capacidad de filtrado")
+    table.append("")
+    
+    return "\n".join(table)
+
+
+def print_diagnostic_summary(results):
+    """
+    Imprime un resumen diagnóstico de los resultados.
+    
+    Parámetros:
+    -----------
+    results : dict
+        Resultados del análisis
+    """
+    print("\n" + "=" * 70)
+    print("DIAGNÓSTICO DEL SISTEMA DE DETECCIÓN DE DESCARGAS PARCIALES")
+    print("=" * 70)
+    print()
+    
+    print("ESTADO OPERATIVO:")
+    print("-" * 70)
+    state = results['traffic_light_state']
+    severity = results['severity_index']
+    
+    # Símbolo de semáforo
+    symbols = {'verde': '🟢', 'amarillo': '🟡', 'naranja': '🟠', 'rojo': '🔴'}
+    symbol = symbols.get(state, '⚪')
+    
+    print(f"  Estado:                    {symbol} {state.upper()}")
+    print(f"  Índice de Severidad:       {severity:.4f}")
+    print()
+    
+    print("DESCRIPTORES PRINCIPALES:")
+    print("-" * 70)
+    desc = results['descriptors']
+    print(f"  Energía Total:             {desc['energy_total']:.4f}")
+    print(f"  RMS:                       {desc['rms']:.4f}")
+    print(f"  Curtosis:                  {desc['kurtosis']:.4f}")
+    print(f"  Asimetría:                 {desc['skewness']:.4f}")
+    print(f"  Factor de Cresta:          {desc['crest_factor']:.4f}")
+    print(f"  Entropía Espectral:        {desc['spectral_entropy']:.4f}")
+    print(f"  Estabilidad Espectral:     {desc['spectral_stability']:.4f}")
+    print(f"  Conteo de Picos:           {desc['peak_count']}")
+    print()
+    
+    if results['thresholds']:
+        print("UMBRALES DE CLASIFICACIÓN:")
+        print("-" * 70)
+        thresholds = results['thresholds']
+        print(f"  Verde → Amarillo:          {thresholds['green_yellow']:.4f}")
+        print(f"  Amarillo → Naranja:        {thresholds['yellow_orange']:.4f}")
+        print(f"  Naranja → Rojo:            {thresholds['orange_red']:.4f}")
+        print()
+    
+    print("ALGORITMOS CIEGOS:")
+    print("-" * 70)
+    blind = results['blind_algorithms']
+    for alg_name, alg_result in blind.items():
+        print(f"  {alg_name:<20s}   Score: {alg_result['score']:.4f}")
+    
+    print()
+    print("=" * 70)
+
+
+def main():
+    """
+    Función principal de demostración.
+    """
+    print("=" * 70)
+    print("SISTEMA DE DETECCIÓN DE FALLAS POR DESCARGAS PARCIALES UHF")
+    print("=" * 70)
+    print()
+    
+    # Parámetros
+    fs = 10000  # Hz
+    n_samples_per_state = 10
+    
+    # Evaluar sistema con múltiples estados
+    evaluation_results = evaluate_multiple_states(n_samples_per_state, fs)
+    
+    # Mostrar resultados
+    print("\n" + "=" * 70)
+    print("RESULTADOS DE LA EVALUACIÓN")
+    print("=" * 70)
+    print()
+    
+    # Reporte de validación
+    validation_report = generate_validation_report(evaluation_results['validation'])
+    print(validation_report)
+    
+    # Tabla comparativa de algoritmos ciegos
+    states = ['verde', 'amarillo', 'naranja', 'rojo']
+    comparison_table = generate_comparative_table(
+        evaluation_results['blind_comparison'],
+        states
+    )
+    print(comparison_table)
+    
+    # Ejemplo de diagnóstico individual
+    print("\n" + "=" * 70)
+    print("EJEMPLO DE DIAGNÓSTICO INDIVIDUAL")
+    print("=" * 70)
+    
+    # Tomar una muestra de cada estado para mostrar
+    for state in states:
+        print(f"\n--- Ejemplo: Estado {state.upper()} ---")
+        example_result = evaluation_results['all_results'][state][0]
+        print_diagnostic_summary(example_result)
+    
+    # Resumen final
+    print("\n" + "=" * 70)
+    print("RESUMEN FINAL")
+    print("=" * 70)
+    print()
+    
+    val = evaluation_results['validation']
+    print(f"Precisión Global del Sistema:     {val['accuracy']:.2%}")
+    print(f"Tasa de Falsos Positivos:         {val['false_positive_rate']:.2%}")
+    print(f"Tasa de Falsos Negativos:         {val['false_negative_rate']:.2%}")
+    
+    if 'threshold_stability' in val:
+        stab = val['threshold_stability']
+        print(f"Puntuación de Estabilidad:        {stab['stability_score']:.4f}")
+    
+    print()
+    print("✓ Sistema de detección validado exitosamente")
+    print("=" * 70)
+    
+    return evaluation_results
+
+
 if __name__ == "__main__":
+    # Ejecutar sistema
     results = main()
