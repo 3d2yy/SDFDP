@@ -1,53 +1,43 @@
 # SDFDP
 
-Signal-based UHF Partial Discharge (UHF-PD) processing and validation framework.
+Signal-based UHF Partial Discharge (UHF-PD) processing and validation framework for doctoral research.
 
 ## Overview
 
-This repository contains two complementary layers:
+Four-phase numerical pipeline for evaluating UHF-PD detection algorithms:
 
-1. **Numerical Core (research pipeline)**
-   - Phase 1: Stochastic wavelet optimization (Monte Carlo + grid search)
-   - Phase 2: Variable isolation via inter-pulse interval extraction (Δt)
-   - Phase 3: Tracking with Kalman, adaptive EWMA, and CUSUM
-   - Phase 4: Quantification (empirical Big-O + convergence/FPR confusion matrix)
+1. **Phase 1 — Stochastic Wavelet Optimisation**: Monte Carlo grid search across wavelet families (db4, sym8, coif3) and thresholding rules (soft/hard × universal/minimax/sqtwolog). Selects the configuration that minimises E[RMSE] subject to Var[RMSE] < ε.
 
-2. **Operational Layer (legacy-compatible diagnostics + GUI integration)**
-   - Preprocessing, descriptor computation, severity index, and traffic-light classification.
+2. **Phase 2 — Variable Isolation (Δt Extraction)**: Detects PD pulses in the denoised signal and computes a 1-D inter-pulse interval vector Δt. All other amplitude/spectral descriptors are deliberately excluded.
 
-## Key Features
+3. **Phase 3 — Tracking Evaluation**: Three algorithms are applied to the Δt vector:
+   - 1-D Kalman Filter
+   - Adaptive EWMA (smoothing factor driven by local variance)
+   - Two-sided CUSUM (Page 1954) change-point detector
 
-- **Advanced preprocessing**
-  - Butterworth band-pass filtering
-  - Signal normalization (z-score, min-max, robust)
-  - Hilbert envelope extraction
-  - Wavelet denoising and adaptive filtering
+4. **Phase 4 — Quantification**:
+   - Empirical Big-O complexity estimation via power-law fitting `t(n) = a·n^b`
+   - Convergence-latency vs false-positive-rate confusion matrix across stochastic event-rate variation levels
 
-- **Doctoral-level validation framework**
-  - AWGN Monte Carlo simulation with constrained optimization
-  - Δt-only descriptor pathway for variable isolation
-  - Exclusive tracking algorithms: 1D Kalman, adaptive EWMA, CUSUM
-  - Complexity estimation and asymptotic characterization
+## Signal Generation Model
 
-- **Backward compatibility**
-  - Legacy feature descriptors and severity scoring remain available
-  - Existing application scripts continue to run
+The synthetic UHF-PD signal is generated via a physics-based model:
+
+- **PD current pulse**: Gemant-Philippoff double-exponential `i(t) = I₀·(exp(−t/τ₁) − exp(−t/τ₂))`
+- **Dielectric channel**: Complex permittivity `ε*(f) = ε_r·ε₀·(1−j·tan δ)` with configurable `ε_r`, `tan δ`, and propagation distance
+- **Vivaldi antenna**: Butterworth bandpass model (300 MHz – 3 GHz) approximating the UWB reception window
 
 ## Project Structure
 
 ```
 SDFDP-main/
-├── preprocessing.py
-├── descriptors.py
-├── blind_algorithms.py
-├── validation.py
-├── severity.py
-├── main.py
-├── app.py
-├── start_gui.py
-├── test_system.py
-├── requirements.txt
-└── gui/
+├── preprocessing.py      # Phase 1: wavelet optimisation + signal generation
+├── descriptors.py         # Phase 2: Δt extraction
+├── blind_algorithms.py    # Phase 3: Kalman / EWMA / CUSUM trackers
+├── validation.py          # Phase 4: Big-O + convergence/FPR
+├── main.py                # Full pipeline entry point
+├── test_system.py         # System verification tests
+└── requirements.txt
 ```
 
 ## Installation
@@ -56,59 +46,46 @@ SDFDP-main/
 pip install -r requirements.txt
 ```
 
-## Quick Usage
+## Usage
 
-### 1) Legacy full demo
+### Full pipeline execution
 
 ```bash
 python main.py
 ```
 
-### 2) New Phase 1–4 numerical workflow
+### Programmatic usage
 
 ```python
-import numpy as np
-from preprocessing import generate_uhf_reference_signal, monte_carlo_wavelet_optimization
-from descriptors import extract_delta_t_vector
-from blind_algorithms import apply_delta_t_tracking
-from validation import (
-    measure_all_tracking_complexities,
-    generate_convergence_confusion_matrix,
-    generate_phase4_report,
-)
+from main import run_phase1, run_phase2, run_phase3, run_phase4
 
-# Phase 1
-clean, noisy = generate_uhf_reference_signal(n_samples=4096, seed=42)
-mc = monte_carlo_wavelet_optimization(reference_clean=clean, n_iterations=1000)
+# Phase 1 — Wavelet optimisation
+mc_result, clean, noisy = run_phase1(n_samples=4096, fs=1e9, seed=42)
 
-# Phase 2
-fs = 1e9
-delta_t = extract_delta_t_vector(noisy, fs, threshold_sigma=3.0)
+# Phase 2 — Δt extraction
+delta_t, denoised = run_phase2(noisy, fs=1e9, mc_result=mc_result)
 
-# Phase 3
-tracking = apply_delta_t_tracking(delta_t)
+# Phase 3 — Tracking
+tracking = run_phase3(delta_t)
 
-# Phase 4
-complexity = measure_all_tracking_complexities()
-confusion = generate_convergence_confusion_matrix()
-print(generate_phase4_report(complexity, confusion))
+# Phase 4 — Quantification
+complexity, confusion, report = run_phase4()
+print(report)
 ```
 
-## Main Outputs
+### System tests
 
-- Optimized wavelet family and threshold configuration
-- 1D Δt vector (inter-pulse intervals)
-- Tracking outputs (filtered trajectories, residuals, alarms)
-- Empirical complexity estimates in form `O(n^b)`
-- Convergence-latency vs false-positive-rate matrices across event-rate variability
+```bash
+python test_system.py
+```
 
 ## Dependencies
 
-- numpy
-- scipy
-- PyWavelets
-- pandas
-- dash / plotly (GUI layer)
+- numpy ≥ 1.24
+- scipy ≥ 1.10
+- PyWavelets ≥ 1.4
+- pandas ≥ 2.0
+- matplotlib ≥ 3.7
 
 ## License
 

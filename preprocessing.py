@@ -79,58 +79,153 @@ class MonteCarloResult:
 # Helper — reference UHF-PD signal generation
 # ===================================================================
 
-def generate_uhf_reference_signal(
+def generate_uhf_pd_signal_physical(
     n_samples: int = 4096,
     fs: float = 1e9,
     n_pulses: int = 12,
     snr_db: float = 30.0,
     seed: Optional[int] = None,
+    # --- Dielectric channel parameters ---
+    epsilon_r: float = 2.2,
+    tan_delta: float = 0.005,
+    propagation_distance_m: float = 0.3,
+    # --- Vivaldi antenna parameters ---
+    f_low_hz: float = 300e6,
+    f_high_hz: float = 3e9,
+    antenna_order: int = 4,
+    # --- PD current-pulse parameters ---
+    tau1_range_ns: Tuple[float, float] = (0.5, 2.0),
+    tau2_range_ns: Tuple[float, float] = (5.0, 20.0),
+    amplitude_range: Tuple[float, float] = (0.5, 2.0),
 ) -> Tuple[Signal, Signal]:
-    """Generate a synthetic UHF partial-discharge reference signal.
+    """Generate a physics-based UHF partial-discharge signal.
 
-    The signal consists of damped oscillatory pulses (characteristic of PD
-    in GIS / transformer insulation) embedded in thermal noise.
+    The model chains three physically-motivated stages:
+
+    1. **PD current pulse** — Gemant-Philippoff double-exponential:
+       ``i(t) = I₀ · (exp(−t/τ₁) − exp(−t/τ₂))``, with rise/fall time
+       constants drawn from the ranges ``tau1_range_ns`` / ``tau2_range_ns``.
+
+    2. **Dielectric channel transfer function** — derived from the complex
+       permittivity ``ε*(f) = ε_r·ε₀·(1 − j·tan δ)`` of the insulating
+       medium (default: mineral oil in power transformers).  The channel
+       introduces frequency-dependent attenuation ``α(f)`` and phase
+       ``β(f)`` over ``propagation_distance_m``.
+
+    3. **Antipodal Vivaldi antenna** — modelled as a Butterworth bandpass
+       of order ``antenna_order`` spanning ``[f_low_hz, f_high_hz]``,
+       capturing the UWB reception window of a typical Vivaldi probe.
 
     Parameters
     ----------
     n_samples : int
-        Length of the signal vector.
+        Length of the output signal vector.
     fs : float
         Sampling frequency in Hz (default 1 GHz for UHF).
     n_pulses : int
         Number of PD pulses to inject.
     snr_db : float
-        Signal-to-noise ratio of the *clean* signal in dB.
+        Signal-to-noise ratio of the *clean* received signal in dB.
     seed : int, optional
         Random seed for reproducibility.
+    epsilon_r : float
+        Relative permittivity of the dielectric medium.
+    tan_delta : float
+        Loss tangent of the dielectric medium.
+    propagation_distance_m : float
+        Propagation distance through the dielectric in metres.
+    f_low_hz, f_high_hz : float
+        Lower and upper −3 dB frequencies of the Vivaldi antenna.
+    antenna_order : int
+        Butterworth order for the antenna transfer function model.
+    tau1_range_ns, tau2_range_ns : tuple of float
+        (min, max) range in nanoseconds for the rise (τ₁) and fall (τ₂)
+        time constants of the Gemant-Philippoff current pulse.
+    amplitude_range : tuple of float
+        (min, max) current-pulse amplitude.
 
     Returns
     -------
     clean : Signal
-        Noise-free reference signal.
+        Noise-free received signal (after channel + antenna).
     noisy : Signal
         Signal contaminated with AWGN at the specified SNR.
     """
     rng = np.random.default_rng(seed)
-    t = np.arange(n_samples) / fs
-    clean: Signal = np.zeros(n_samples, dtype=np.float64)
+    freqs = np.fft.rfftfreq(n_samples, d=1.0 / fs)  # one-sided
+
+    # ------------------------------------------------------------------
+    # Stage 1 — Generate PD current pulses (Gemant-Philippoff)
+    # ------------------------------------------------------------------
+    current_signal: Signal = np.zeros(n_samples, dtype=np.float64)
 
     for _ in range(n_pulses):
         pos = rng.integers(50, n_samples - 200)
-        f_osc = rng.uniform(300e6, 800e6)          # UHF band
-        tau = rng.uniform(1e-9, 5e-9)              # decay constant
-        amp = rng.uniform(0.5, 2.0)
-        dur = min(int(15e-9 * fs), n_samples - pos)
+        tau1 = rng.uniform(*tau1_range_ns) * 1e-9          # rise
+        tau2 = rng.uniform(*tau2_range_ns) * 1e-9          # fall
+        amp = rng.uniform(*amplitude_range)
+        dur = min(int(50e-9 * fs), n_samples - pos)        # 50 ns window
         t_local = np.arange(dur) / fs
-        pulse = amp * np.sin(2 * np.pi * f_osc * t_local) * np.exp(-t_local / tau)
-        clean[pos:pos + dur] += pulse
+        pulse = amp * (np.exp(-t_local / tau2) - np.exp(-t_local / tau1))
+        current_signal[pos:pos + dur] += pulse
 
-    # AWGN at requested SNR
+    # ------------------------------------------------------------------
+    # Stage 2 — Dielectric channel transfer function  H_d(f)
+    #
+    #   ε*(f) = ε_r · ε₀ · (1 − j·tan δ)
+    #   k(f)  = 2πf · √(μ₀ · ε*(f))  =  β(f) − j·α(f)
+    #   H_d(f) = exp(−j · k(f) · d)
+    # ------------------------------------------------------------------
+    eps_0 = 8.854187817e-12       # F/m
+    mu_0 = 4.0 * np.pi * 1e-7    # H/m
+    d = propagation_distance_m
+
+    eps_complex = epsilon_r * eps_0 * (1.0 - 1j * tan_delta)
+
+    # Avoid DC singularity
+    freqs_safe = freqs.copy()
+    freqs_safe[0] = 1.0  # placeholder, DC bin zeroed later
+
+    omega = 2.0 * np.pi * freqs_safe
+    k = omega * np.sqrt(mu_0 * eps_complex)           # complex wavenumber
+    H_dielectric = np.exp(-1j * k * d)
+    H_dielectric[0] = 0.0  # suppress DC
+
+    # ------------------------------------------------------------------
+    # Stage 3 — Vivaldi antenna transfer function  H_ant(f)
+    #
+    #   Butterworth bandpass of order `antenna_order` evaluated on the
+    #   frequency axis.  This approximates the UWB reception window.
+    # ------------------------------------------------------------------
+    f_center = np.sqrt(f_low_hz * f_high_hz)
+    bw = f_high_hz - f_low_hz
+    s = 1j * freqs_safe / f_center                    # normalised frequency
+    # Butterworth magnitude-squared for bandpass
+    n_ord = antenna_order
+    H_ant_mag2 = 1.0 / (1.0 + ((freqs_safe**2 - f_center**2) / (freqs_safe * bw))**(2 * n_ord))
+    H_antenna = np.sqrt(H_ant_mag2)
+    H_antenna[0] = 0.0
+
+    # ------------------------------------------------------------------
+    # Apply channel in frequency domain
+    # ------------------------------------------------------------------
+    I_f = np.fft.rfft(current_signal)
+    V_received_f = I_f * H_dielectric * H_antenna
+    clean: Signal = np.fft.irfft(V_received_f, n=n_samples)
+
+    # ------------------------------------------------------------------
+    # Add AWGN at specified SNR
+    # ------------------------------------------------------------------
     sig_power = np.mean(clean ** 2) + 1e-30
-    noise_power = sig_power / (10 ** (snr_db / 10))
-    noise = rng.normal(0, np.sqrt(noise_power), n_samples)
+    noise_power = sig_power / (10.0 ** (snr_db / 10.0))
+    noise = rng.normal(0.0, np.sqrt(noise_power), n_samples)
     noisy: Signal = clean + noise
+
     return clean, noisy
+
+
+# Backward-compatible alias
+generate_uhf_reference_signal = generate_uhf_pd_signal_physical
 
 
 # ===================================================================
