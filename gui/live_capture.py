@@ -4,7 +4,7 @@ Pestaña de Captura en Vivo
 
 Captura y procesamiento en tiempo real de señales de descargas parciales.
 Soporta:
-- NI PXIe-5185 (hardware real)
+- NI PXIe-5185 (hardware real via hardware_bridge)
 - Modo simulación (generación sintética)
 """
 
@@ -24,8 +24,10 @@ from severity import assess_severity
 from main import generate_synthetic_signal
 from gui.plot_utils import (
     apply_professional_style, COLOR_PALETTE, create_gradient_line,
-    create_professional_card_style, create_metric_card
+    create_professional_card_style, create_metric_card,
+    create_severity_zone_shapes,
 )
+from gui.hardware_bridge import capture, CaptureConfig, PRESETS, PXIE_5185_SPEC
 
 
 # ============================================================================
@@ -59,12 +61,16 @@ def create_layout():
             dbc.Col([
                 dbc.Card([
                     dbc.CardHeader(html.H4([
-                        html.I(className="fas fa-cog me-2"),
+                        html.I(className="fas fa-cog me-2",
+                               style={'color': COLOR_PALETTE['info']}),
                         "Control de Captura"
-                    ])),
+                    ], style={'fontSize': '15px', 'fontWeight': '600'})),
                     dbc.CardBody([
                         # Modo de captura
-                        html.Label("Modo de Captura:", className="fw-bold"),
+                        html.Label("Modo de Captura:",
+                                   className="fw-bold",
+                                   style={'fontSize': '12px',
+                                          'color': 'rgba(255,255,255,0.7)'}),
                         dbc.RadioItems(
                             id="capture-mode",
                             options=[
@@ -74,12 +80,32 @@ def create_layout():
                             value="simulation",
                             className="mb-3"
                         ),
+
+                        # Capture preset selector
+                        html.Label("Preset de Captura:",
+                                   className="fw-bold mt-2",
+                                   style={'fontSize': '12px',
+                                          'color': 'rgba(255,255,255,0.7)'}),
+                        dbc.Select(
+                            id="capture-preset",
+                            options=[
+                                {"label": "UHF PD Standard (200 µs)", "value": "uhf_pd_standard"},
+                                {"label": "UHF PD High-Res (1 ms)",   "value": "uhf_pd_highres"},
+                                {"label": "UHF PD Fast (50 µs)",      "value": "uhf_pd_fast"},
+                                {"label": "Demo Simulation",          "value": "demo_simulation"},
+                            ],
+                            value="demo_simulation",
+                            className="mb-3",
+                        ),
                         
-                        html.Hr(),
+                        html.Hr(style={'borderColor': 'rgba(255,255,255,0.08)'}),
                         
                         # Configuración de hardware
                         html.Div(id="hardware-config", children=[
-                            html.Label("Configuración Hardware:", className="fw-bold"),
+                            html.Label("Configuración Hardware:",
+                                       className="fw-bold",
+                                       style={'fontSize': '12px',
+                                              'color': 'rgba(255,255,255,0.7)'}),
                             dbc.Input(
                                 id="device-name",
                                 placeholder="Device (ej: PXI1Slot2)",
@@ -93,7 +119,10 @@ def create_layout():
                                 type="number",
                                 className="mb-2"
                             ),
-                            html.Label("Frecuencia de Muestreo (GS/s):", className="mt-2"),
+                            html.Label("Frecuencia de Muestreo (GS/s):",
+                                       className="mt-2",
+                                       style={'fontSize': '12px',
+                                              'color': 'rgba(255,255,255,0.55)'}),
                             dbc.Input(
                                 id="sample-rate",
                                 value="12.5",
@@ -412,13 +441,19 @@ def register_callbacks(app):
                         device_name, channel, sample_rate):
         """Actualizar datos en tiempo real."""
         
-        # Capturar datos
+        # Capturar datos via hardware_bridge
         fs = 10000  # Hz para simulación
         
         try:
             if mode == 'hardware':
-                signal = capture_from_hardware(device_name, int(channel), float(sample_rate))
-                fs = float(sample_rate) * 1e9
+                cfg = CaptureConfig(
+                    device=device_name,
+                    channel=int(channel),
+                    sample_rate=float(sample_rate) * 1e9,
+                    duration=0.001,
+                )
+                signal = capture(cfg)
+                fs = cfg.sample_rate
             else:
                 signal = simulate_capture(sim_state, noise_level)
         except Exception as e:
@@ -490,17 +525,16 @@ def create_signal_figure(signal, times):
     fig = go.Figure()
     
     if len(signal) > 0:
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Scattergl(
             x=list(range(len(signal))),
             y=signal,
             mode='lines',
             line=dict(
-                color=COLOR_PALETTE['gradient_3'][0],
+                color=COLOR_PALETTE['seq'][0],
                 width=1.5,
-                shape='spline'
             ),
             fill='tozeroy',
-            fillcolor='rgba(79, 172, 254, 0.1)',
+            fillcolor=f"{COLOR_PALETTE['seq'][0]}12",
             name='Señal',
             hovertemplate='<b>Muestra:</b> %{x}<br><b>Amplitud:</b> %{y:.4f}<extra></extra>'
         ))
