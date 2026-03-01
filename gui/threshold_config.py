@@ -17,6 +17,10 @@ from main import generate_synthetic_signal
 from preprocessing import preprocess_signal
 from descriptors import compute_all_descriptors
 from severity import assess_severity, create_baseline_profile
+from gui.plot_utils import (
+    apply_professional_style, COLOR_PALETTE,
+    create_confusion_heatmap,
+)
 
 
 # ============================================================================
@@ -320,14 +324,13 @@ def register_callbacks(app):
         fig.add_vline(x=t3, line_dash="dash", line_color="red",
                      annotation_text=f"Naranja-Rojo: {t3:.2f}")
         
+        fig = apply_professional_style(fig, height=300)
         fig.update_layout(
             xaxis_title="Índice de Severidad",
             yaxis_title="",
             xaxis=dict(range=[0, 1]),
             yaxis=dict(showticklabels=False),
-            template="plotly_white",
-            margin=dict(l=50, r=20, t=20, b=40),
-            showlegend=True
+            showlegend=True,
         )
         
         return fig
@@ -502,63 +505,25 @@ def register_callbacks(app):
         correct = sum(confusion_matrix[state][state] for state in states)
         accuracy = correct / total
         
-        # Crear tabla de matriz de confusión
-        matrix_table = dbc.Table([
-            html.Thead([
-                html.Tr([
-                    html.Th("Real \\ Predicho"),
-                    html.Th("🟢 Verde"),
-                    html.Th("🟡 Amarillo"),
-                    html.Th("🟠 Naranja"),
-                    html.Th("🔴 Rojo"),
-                ])
-            ]),
-            html.Tbody([
-                html.Tr([
-                    html.Td(f"🟢 Verde", className="fw-bold"),
-                    html.Td(confusion_matrix['verde']['verde'], 
-                           style={'backgroundColor': '#d4edda' if confusion_matrix['verde']['verde'] else ''}),
-                    html.Td(confusion_matrix['verde']['amarillo']),
-                    html.Td(confusion_matrix['verde']['naranja']),
-                    html.Td(confusion_matrix['verde']['rojo']),
-                ]),
-                html.Tr([
-                    html.Td(f"🟡 Amarillo", className="fw-bold"),
-                    html.Td(confusion_matrix['amarillo']['verde']),
-                    html.Td(confusion_matrix['amarillo']['amarillo'],
-                           style={'backgroundColor': '#fff3cd' if confusion_matrix['amarillo']['amarillo'] else ''}),
-                    html.Td(confusion_matrix['amarillo']['naranja']),
-                    html.Td(confusion_matrix['amarillo']['rojo']),
-                ]),
-                html.Tr([
-                    html.Td(f"🟠 Naranja", className="fw-bold"),
-                    html.Td(confusion_matrix['naranja']['verde']),
-                    html.Td(confusion_matrix['naranja']['amarillo']),
-                    html.Td(confusion_matrix['naranja']['naranja'],
-                           style={'backgroundColor': '#fff3cd' if confusion_matrix['naranja']['naranja'] else ''}),
-                    html.Td(confusion_matrix['naranja']['rojo']),
-                ]),
-                html.Tr([
-                    html.Td(f"🔴 Rojo", className="fw-bold"),
-                    html.Td(confusion_matrix['rojo']['verde']),
-                    html.Td(confusion_matrix['rojo']['amarillo']),
-                    html.Td(confusion_matrix['rojo']['naranja']),
-                    html.Td(confusion_matrix['rojo']['rojo'],
-                           style={'backgroundColor': '#f8d7da' if confusion_matrix['rojo']['rojo'] else ''}),
-                ])
-            ])
-        ], bordered=True, hover=True)
+        # Construir numpy array for heatmap
+        labels = ['Verde', 'Amarillo', 'Naranja', 'Rojo']
+        cm = np.array([[confusion_matrix[ts][ps] for ps in states] for ts in states])
+        
+        # Use the professional confusion-matrix heatmap
+        cm_fig = create_confusion_heatmap(
+            cm, labels,
+            title=f"Matriz de Confusión  —  Precisión: {accuracy:.1%}",
+        )
         
         return html.Div([
             dbc.Alert([
-                html.H4(f"📊 Precisión Global: {accuracy:.2%}"),
+                html.H4(f"Precisión Global: {accuracy:.2%}"),
                 html.P(f"Correctas: {correct} / {total}")
             ], color="info"),
             
-            html.H5("Matriz de Confusión", className="mt-3 mb-3"),
-            matrix_table,
+            dcc.Graph(figure=cm_fig, config={'displayModeBar': False},
+                      style={'height': '400px'}),
             
-            html.Small("Cada celda muestra el número de clasificaciones. "
-                      "Las celdas resaltadas indican clasificaciones correctas.",
-                      className="text-muted")
+            html.Small("Cada celda muestra el número de clasificaciones.",
+                      className="text-muted mt-2")
         ])

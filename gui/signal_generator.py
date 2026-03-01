@@ -18,6 +18,7 @@ import os
 import sys
 sys.path.append('..')
 from main import generate_synthetic_signal
+from gui.plot_utils import apply_professional_style, COLOR_PALETTE
 
 
 # ============================================================================
@@ -542,20 +543,21 @@ def create_generated_signal_figure(signal, fs):
     
     fig = go.Figure()
     
-    fig.add_trace(go.Scatter(
-        x=t * 1000,  # Convertir a ms
+    fig.add_trace(go.Scattergl(
+        x=t * 1000,
         y=signal,
         mode='lines',
-        line=dict(color='#1f77b4', width=1),
-        name='Señal'
+        line=dict(color=COLOR_PALETTE['primary'], width=1.5),
+        fill='tozeroy',
+        fillcolor='rgba(102,126,234,0.12)',
+        name='Señal',
     ))
     
+    fig = apply_professional_style(fig, height=350)
     fig.update_layout(
         xaxis_title="Tiempo (ms)",
         yaxis_title="Amplitud",
-        template="plotly_white",
-        margin=dict(l=50, r=20, t=20, b=40),
-        hovermode='x'
+        hovermode='x',
     )
     
     return fig
@@ -573,22 +575,22 @@ def create_generated_spectrum_figure(signal, fs):
     
     fig = go.Figure()
     
-    fig.add_trace(go.Scatter(
+    fig.add_trace(go.Scattergl(
         x=freqs,
         y=magnitude,
         mode='lines',
-        line=dict(color='#ff7f0e', width=1),
+        line=dict(color=COLOR_PALETTE['warning'], width=1.5),
         fill='tozeroy',
-        name='Espectro'
+        fillcolor='rgba(251,191,36,0.18)',
+        name='Espectro',
     ))
     
+    fig = apply_professional_style(fig, height=250)
     fig.update_layout(
-        title="Espectro de Frecuencia",
+        title=dict(text='Espectro de Frecuencia', x=0, xanchor='left'),
         xaxis_title="Frecuencia (Hz)",
         yaxis_title="Magnitud",
-        template="plotly_white",
-        margin=dict(l=50, r=20, t=40, b=40),
-        hovermode='x'
+        hovermode='x',
     )
     
     return fig
@@ -601,17 +603,18 @@ def create_generated_histogram_figure(signal):
     fig.add_trace(go.Histogram(
         x=signal,
         nbinsx=50,
-        marker_color='#2ca02c',
-        name='Distribución'
+        marker_color=COLOR_PALETTE['success'],
+        opacity=0.75,
+        name='Distribución',
     ))
     
+    fig = apply_professional_style(fig, height=250)
     fig.update_layout(
-        title="Distribución de Amplitudes",
+        title=dict(text='Distribución de Amplitudes', x=0, xanchor='left'),
         xaxis_title="Amplitud",
         yaxis_title="Frecuencia",
-        template="plotly_white",
-        margin=dict(l=50, r=20, t=40, b=40),
-        showlegend=False
+        showlegend=False,
+        bargap=0.05,
     )
     
     return fig

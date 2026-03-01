@@ -23,6 +23,10 @@ sys.path.append('..')
 from preprocessing import preprocess_signal
 from descriptors import compute_all_descriptors
 from severity import assess_severity, create_baseline_profile
+from gui.plot_utils import (
+    apply_professional_style, COLOR_PALETTE,
+    create_professional_card_style, create_metric_card,
+)
 
 
 # ============================================================================
@@ -56,9 +60,12 @@ def create_layout():
                                 'lineHeight': '150px',
                                 'borderWidth': '2px',
                                 'borderStyle': 'dashed',
-                                'borderRadius': '10px',
+                                'borderRadius': '12px',
                                 'textAlign': 'center',
-                                'backgroundColor': '#f8f9fa'
+                                'backgroundColor': 'rgba(255,255,255,0.03)',
+                                'borderColor': 'rgba(102,126,234,0.35)',
+                                'color': 'rgba(255,255,255,0.5)',
+                                'transition': 'all 300ms ease',
                             },
                             multiple=False
                         ),
@@ -447,16 +454,16 @@ def create_signal_comparison_figure(original, processed, fs):
     
     # Señal original
     fig.add_trace(
-        go.Scatter(x=t_original, y=original, mode='lines',
-                  line=dict(color='#1f77b4', width=1),
+        go.Scattergl(x=t_original, y=original, mode='lines',
+                  line=dict(color=COLOR_PALETTE['primary'], width=1.5),
                   name='Original'),
         row=1, col=1
     )
     
     # Señal procesada
     fig.add_trace(
-        go.Scatter(x=t_processed, y=processed, mode='lines',
-                  line=dict(color='#2ca02c', width=1),
+        go.Scattergl(x=t_processed, y=processed, mode='lines',
+                  line=dict(color=COLOR_PALETTE['success'], width=1.5),
                   name='Procesada'),
         row=2, col=1
     )
@@ -465,12 +472,8 @@ def create_signal_comparison_figure(original, processed, fs):
     fig.update_yaxes(title_text="Amplitud", row=1, col=1)
     fig.update_yaxes(title_text="Amplitud", row=2, col=1)
     
-    fig.update_layout(
-        height=400,
-        showlegend=False,
-        template="plotly_white",
-        margin=dict(l=50, r=20, t=40, b=40)
-    )
+    fig = apply_professional_style(fig, height=400)
+    fig.update_layout(showlegend=False)
     
     return fig
 
@@ -489,21 +492,21 @@ def create_spectrum_figure(signal, fs):
     
     fig = go.Figure()
     
-    fig.add_trace(go.Scatter(
+    fig.add_trace(go.Scattergl(
         x=freqs,
         y=magnitude,
         mode='lines',
-        line=dict(color='#ff7f0e', width=1),
+        line=dict(color=COLOR_PALETTE['warning'], width=1.5),
         fill='tozeroy',
-        name='Magnitud'
+        fillcolor='rgba(251,191,36,0.18)',
+        name='Magnitud',
     ))
     
+    fig = apply_professional_style(fig, height=300)
     fig.update_layout(
         xaxis_title="Frecuencia (Hz)",
         yaxis_title="Magnitud",
-        template="plotly_white",
-        margin=dict(l=50, r=20, t=20, b=40),
-        hovermode='x'
+        hovermode='x',
     )
     
     return fig
@@ -564,17 +567,20 @@ def create_descriptors_radar(descriptors):
         r=values,
         theta=desc_names,
         fill='toself',
-        line_color='#9467bd',
-        name='Descriptores'
+        fillcolor='rgba(118,75,162,0.30)',
+        line_color=COLOR_PALETTE['secondary'],
+        name='Descriptores',
     ))
     
+    fig = apply_professional_style(fig, height=300)
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True, range=[0, 1])
+            radialaxis=dict(visible=True, range=[0, 1],
+                            gridcolor='rgba(255,255,255,0.08)'),
+            angularaxis=dict(gridcolor='rgba(255,255,255,0.06)'),
+            bgcolor='rgba(0,0,0,0)',
         ),
         showlegend=False,
-        template="plotly_white",
-        margin=dict(l=50, r=50, t=30, b=30)
     )
     
     return fig
