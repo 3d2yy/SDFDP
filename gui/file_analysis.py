@@ -498,7 +498,7 @@ def create_spectrum_figure(signal, fs):
         mode='lines',
         line=dict(color=COLOR_PALETTE['warning'], width=1.5),
         fill='tozeroy',
-        fillcolor=f"{COLOR_PALETTE['warning']}18",
+        fillcolor='rgba(251,191,36,0.18)',
         name='Magnitud',
     ))
     
@@ -567,7 +567,7 @@ def create_descriptors_radar(descriptors):
         r=values,
         theta=desc_names,
         fill='toself',
-        fillcolor=f"{COLOR_PALETTE['secondary']}30",
+        fillcolor='rgba(118,75,162,0.30)',
         line_color=COLOR_PALETTE['secondary'],
         name='Descriptores',
     ))

@@ -549,7 +549,7 @@ def create_generated_signal_figure(signal, fs):
         mode='lines',
         line=dict(color=COLOR_PALETTE['primary'], width=1.5),
         fill='tozeroy',
-        fillcolor=f"{COLOR_PALETTE['primary']}12",
+        fillcolor='rgba(102,126,234,0.12)',
         name='Señal',
     ))
     
@@ -581,7 +581,7 @@ def create_generated_spectrum_figure(signal, fs):
         mode='lines',
         line=dict(color=COLOR_PALETTE['warning'], width=1.5),
         fill='tozeroy',
-        fillcolor=f"{COLOR_PALETTE['warning']}18",
+        fillcolor='rgba(251,191,36,0.18)',
         name='Espectro',
     ))
     

@@ -534,7 +534,7 @@ def create_signal_figure(signal, times):
                 width=1.5,
             ),
             fill='tozeroy',
-            fillcolor=f"{COLOR_PALETTE['seq'][0]}12",
+            fillcolor='rgba(102,126,234,0.12)',
             name='Señal',
             hovertemplate='<b>Muestra:</b> %{x}<br><b>Amplitud:</b> %{y:.4f}<extra></extra>'
         ))

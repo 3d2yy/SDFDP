@@ -371,7 +371,7 @@ def register_callbacks(app):
             x=x, y=result.ewma.alpha_sequence, mode='lines',
             line=dict(color=COLOR_PALETTE['seq'][4], width=2),
             fill='tozeroy',
-            fillcolor=f'{COLOR_PALETTE["seq"][4]}18',
+            fillcolor='rgba(251,146,60,0.18)',
             name='α[k]',
         ))
         fig4 = apply_professional_style(fig4, height=260)
